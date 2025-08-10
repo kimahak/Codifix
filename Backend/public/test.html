@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codifix Test</title>
+</head>
+
+<body>
+    <h1>Socket.IO Test</h1>
+    <p id="status">Connecting...</p>
+
+    <!-- Add Socket.IO client library -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        // connect to backend
+        const socket = io("http://localhost:5000");
+
+        socket.on('connection', (stream) => {
+            document.getElementById("status").textContent = "Connected! 🎉";
+            console.log("Connected to server with ID:", socket.id);
+            // Send hello to backend
+            socket.emit("helloFromClient", "Hello from browser!");
+        });
+
+        socket.on("disconnect", () => {
+            document.getElementById("status").textContent = "Disconnected 😢";
+
+        });
+    </script>
+</body>
+
+</html>
