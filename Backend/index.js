@@ -26,6 +26,12 @@ io.on("connection", (socket) => {
     // Send a message back to React
     socket.emit("messageFromServer", "Hello React, this is backend!");
   });
+   // NEW — Listen for code changes from any client
+  socket.on("codeChange", (newCode) => {
+    // Send the updated code to everyone except the sender
+    socket.broadcast.emit("codeUpdate", newCode);
+  });
+
 
   socket.on("disconnect", () => {
     console.log("A friend left:", socket.id);
