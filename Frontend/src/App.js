@@ -1,48 +1,39 @@
-import React, { useEffect, useState } from "react";
-import { io } from "socket.io-client";
+import React, { useState, useEffect } from "react";
+import CodeMirror from "@uiw/react-codemirror";
+import { javascript } from "@codemirror/lang-javascript";
+import io from "socket.io-client";
 
-function App() {
-  const [code, setCode] = useState("");
-  const [socket, setSocket] = useState(null);
+// Connect to backend
+const socket = io("http://localhost:3001"); // Change to your server URL if deployed
+
+export default function App() {
+  const [code, setCode] = useState("// Start coding here...");
 
   useEffect(() => {
-    const newSocket = io("http://localhost:5000");
-    setSocket(newSocket);
-
-    newSocket.on("connect", () => {
-      console.log("Connected to backend:", newSocket.id);
+    // Listen for code updates from other users
+    socket.on("code-update", (newCode) => {
+      setCode(newCode);
     });
 
-    // When another user sends code
-    newSocket.on("codeUpdate", (updatedCode) => {
-      setCode(updatedCode);
-    });
-
-    return () => newSocket.disconnect();
+    return () => {
+      socket.off("code-update");
+    };
   }, []);
 
-  const handleChange = (e) => {
-    const newValue = e.target.value;
-    setCode(newValue);
-
-    // Send to server so others see it
-    if (socket) {
-      socket.emit("codeChange", newValue);
-    }
+  const handleChange = (value) => {
+    setCode(value);
+    socket.emit("code-change", value); // Send changes to server
   };
 
   return (
-    <div>
-      <h1>Codifix</h1>
-      <textarea
+    <div style={{ padding: "20px" }}>
+      <h1>Codifix Editor</h1>
+      <CodeMirror
         value={code}
+        height="400px"
+        extensions={[javascript({ jsx: true })]}
         onChange={handleChange}
-        rows={15}
-        cols={60}
-        placeholder="Start typing code here..."
       />
     </div>
   );
 }
-
-export default App;

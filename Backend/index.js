@@ -5,40 +5,33 @@ const cors = require("cors");
 
 const app = express();
 app.use(cors());
-app.use(express.json());
-
-app.get("/", (req, res) => {
-  res.send("Codifix backend is awake! 🚀");
-});
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*" }, // allow all origins for dev
+  cors: {
+    origin: "*", // Allow all origins (change to your frontend URL in production)
+  },
 });
+
+let sharedCode = "// Shared code will appear here...";
 
 io.on("connection", (socket) => {
-  console.log("A friend connected:", socket.id);
+  console.log("A user connected:", socket.id);
 
-  // Listen for a message from React
-  socket.on("helloFromReact", (msg) => {
-    console.log("React says:", msg);
+  // Send current code to new user
+  socket.emit("code-update", sharedCode);
 
-    // Send a message back to React
-    socket.emit("messageFromServer", "Hello React, this is backend!");
+  // Listen for changes
+  socket.on("code-change", (newCode) => {
+    sharedCode = newCode;
+    socket.broadcast.emit("code-update", newCode); // Send to all except sender
   });
-   // NEW — Listen for code changes from any client
-  socket.on("codeChange", (newCode) => {
-    // Send the updated code to everyone except the sender
-    socket.broadcast.emit("codeUpdate", newCode);
-  });
-
 
   socket.on("disconnect", () => {
-    console.log("A friend left:", socket.id);
+    console.log("User disconnected:", socket.id);
   });
 });
 
-const PORT = 5000;
-server.listen(PORT, () => {
-  console.log(`Codifix backend listening at http://localhost:${PORT}`);
+server.listen(3001, () => {
+  console.log("Server running on http://localhost:3001");
 });
