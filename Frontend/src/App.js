@@ -1,61 +1,39 @@
-import React, { useEffect, useRef, useState } from "react";
-import { io } from "socket.io-client";
-import { EditorState } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
-import { basicSetup } from "@codemirror/basic-setup";
+import React, { useState, useEffect } from "react";
+import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
+import io from "socket.io-client";
 
-function App() {
-  const editorRef = useRef(null);
-  const [socket, setSocket] = useState(null);
-  const [view, setView] = useState(null);
+// Connect to backend
+const socket = io("http://localhost:3001"); // Change to your server URL if deployed
+
+export default function App() {
+  const [code, setCode] = useState("// Start coding here...");
 
   useEffect(() => {
-    const newSocket = io("http://localhost:5000");
-    setSocket(newSocket);
-
-    newSocket.on("codeUpdate", (updatedCode) => {
-      if (view) {
-        view.dispatch({
-          changes: { from: 0, to: view.state.doc.length, insert: updatedCode }
-        });
-      }
+    // Listen for code updates from other users
+    socket.on("code-update", (newCode) => {
+      setCode(newCode);
     });
 
-    return () => newSocket.disconnect();
-  }, [view]);
+    return () => {
+      socket.off("code-update");
+    };
+  }, []);
 
-  useEffect(() => {
-    if (editorRef.current && !view) {
-      const startState = EditorState.create({
-        doc: "",
-        extensions: [
-          basicSetup,
-          javascript(),
-          EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
-              const code = update.state.doc.toString();
-              if (socket) socket.emit("codeChange", code);
-            }
-          })
-        ]
-      });
-
-      const newView = new EditorView({
-        state: startState,
-        parent: editorRef.current
-      });
-
-      setView(newView);
-    }
-  }, [editorRef, view, socket]);
+  const handleChange = (value) => {
+    setCode(value);
+    socket.emit("code-change", value); // Send changes to server
+  };
 
   return (
-    <div>
-      <h1>Codifix</h1>
-      <div ref={editorRef} style={{ border: "1px solid #ccc", height: "500px" }}></div>
+    <div style={{ padding: "20px" }}>
+      <h1>Codifix Editor</h1>
+      <CodeMirror
+        value={code}
+        height="400px"
+        extensions={[javascript({ jsx: true })]}
+        onChange={handleChange}
+      />
     </div>
   );
 }
-
-export default App;
