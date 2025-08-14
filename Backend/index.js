@@ -1,37 +1,68 @@
+require("dotenv").config();
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
+const mongoose = require("mongoose");
 const cors = require("cors");
 
 const app = express();
-app.use(cors());
-
 const server = http.createServer(app);
+
+// --- Load env variables ---
+const PORT = process.env.PORT || 3001;
+const MONGO_URI = process.env.MONGO_URI;
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:3000";
+
+// --- Middleware ---
+app.use(cors({ origin: CORS_ORIGIN }));
+
+// --- MongoDB connection ---
+mongoose
+  .connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch((err) => console.error("❌ MongoDB connection error:", err));
+
+// --- Document model ---
+const DocumentSchema = new mongoose.Schema({
+  _id: String,
+  content: String,
+});
+const Document = mongoose.model("Document", DocumentSchema);
+
+// --- Helper ---
+async function findOrCreateDocument(id) {
+  if (!id) return;
+  const doc = await Document.findById(id);
+  if (doc) return doc;
+  return await Document.create({ _id: id, content: "" });
+}
+
+// --- Socket.IO setup ---
 const io = new Server(server, {
-  cors: {
-    origin: "*", // Allow all origins (change to your frontend URL in production)
-  },
+  cors: { origin: CORS_ORIGIN, methods: ["GET", "POST"] },
 });
 
-let sharedCode = "// Shared code will appear here...";
-
 io.on("connection", (socket) => {
-  console.log("A user connected:", socket.id);
+  console.log("🔌 Connected:", socket.id);
 
-  // Send current code to new user
-  socket.emit("code-update", sharedCode);
+  socket.on("get-document", async (documentId) => {
+    const document = await findOrCreateDocument(documentId);
+    socket.join(documentId);
+    socket.emit("load-document", document.content);
 
-  // Listen for changes
-  socket.on("code-change", (newCode) => {
-    sharedCode = newCode;
-    socket.broadcast.emit("code-update", newCode); // Send to all except sender
+    socket.on("code-change", async (delta) => {
+      await Document.findByIdAndUpdate(documentId, { content: delta });
+      socket.broadcast.to(documentId).emit("code-update", delta);
+    });
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+    console.log("❌ Disconnected:", socket.id);
   });
 });
 
-server.listen(3001, () => {
-  console.log("Server running on http://localhost:3001");
+app.get("/", (req, res) => res.send("Codifix Backend Running"));
+
+server.listen(PORT, () => {
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
