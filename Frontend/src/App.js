@@ -1,36 +1,49 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
-import io from "socket.io-client";
+import { io } from "socket.io-client";
 
-// Connect to backend
-const socket = io("http://localhost:3001"); // Change to your server URL if deployed
+const SOCKET_URL = "http://localhost:3001";
+const DOC_ID = "main"; // can make dynamic later
 
 export default function App() {
-  const [code, setCode] = useState("// Start coding here...");
+  const [code, setCode] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const socketRef = useRef(null);
 
   useEffect(() => {
-    // Listen for code updates from other users
+    const socket = io(SOCKET_URL, { transports: ["websocket"] });
+    socketRef.current = socket;
+
+    socket.emit("get-document", DOC_ID);
+
+    socket.on("load-document", (document) => {
+      setCode(document);
+      setLoaded(true);
+    });
+
     socket.on("code-update", (newCode) => {
       setCode(newCode);
     });
 
     return () => {
-      socket.off("code-update");
+      socket.disconnect();
     };
   }, []);
 
   const handleChange = (value) => {
     setCode(value);
-    socket.emit("code-change", value); // Send changes to server
+    if (loaded) {
+      socketRef.current.emit("code-change", value);
+    }
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>Codifix Editor</h1>
+    <div style={{ padding: "16px" }}>
+      <h1>Codifix</h1>
       <CodeMirror
         value={code}
-        height="400px"
+        height="500px"
         extensions={[javascript({ jsx: true })]}
         onChange={handleChange}
       />
